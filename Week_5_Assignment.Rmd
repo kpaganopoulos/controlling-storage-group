@@ -1,0 +1,132 @@
+---
+title: "Week 5 Assignment - Group 2"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Solutions:
+
+In this file we implement the solutions of the questions that involve programming (Questions A, B). For more detailed explanations please see the attached word file.
+
+First we import the relevant libraries:
+
+```{r}
+library(readxl)
+library(forecast)
+library(dplyr)
+library(tidyverse)
+library(lubridate)
+library(padr)
+library(tm)
+library(rlist)
+library(ggplot2)
+library(SciViews)
+```
+
+Then we read the hourly prices for energy in excel file:
+
+```{r}
+data_orig <- read_excel("Week 5 Assignment data.xlsx")
+data_orig
+```
+
+We make our dataset easier to use by deleting the first 5 rows and changing the column names:
+
+```{r}
+data_orig <- data_orig[-(1:5), ]
+colnames(data_orig)<- c("timestamp","hour","price")
+data_orig
+```
+
+### Question A
+
+Then we need to find the average price of energy for every hour of the day, given the 56 days we have available.
+
+```{r}
+data_new <- mutate(data_orig, hour_day = rep(1:24, times=56))
+data_new$price <-as.double(data_new$price)
+by_hour <- group_by(data_new,hour_day)
+mean_price <- summarise(by_hour, price_hour = mean(price,na.rm = TRUE))
+data_new
+```
+
+The average price per hour is the following:
+
+```{r}
+mean_price
+```
+
+### Question B
+
+We first define the decision variables:
+
+```{r}
+decision_variables <- mean_price
+decision_variables$p <- 1
+decision_variables$g <- 1
+decision_variables$s <- 7*10^6
+
+price <- decision_variables$price_hour
+pump <- decision_variables$p
+gen <- decision_variables$g
+res <- decision_variables$s 
+```
+
+We now implement the optimisation function:
+
+```{r}
+profit.optim <- function(x, price){
+  #assigning parameters
+  bm <- x[1]
+  ba <- x[2]
+  Cm <- x[3]
+  Ca <- x[4]
+  Dm <- x[5]
+  Da <- x[6]
+  p <- x[7:30]
+  g <- x[31:54]
+  s <- x[55:78]
+  price <- price
+  #Calculations
+  s[1]<- 5000000+14000*1*60
+  for (t in 2:12){
+    if (s[t-1]+bm*price[t-1]<=Cm){
+      p[t]<-1
+    }else{
+      p[t]<-0
+    } 
+    if(s[t-1]+bm*price[t-1]>=Dm){
+      g[t]<-1
+    }else{
+      g[t]<-0
+    }
+    s[t]<- 14000*p[t]*60-16000*g[t]*60+s[t-1]
+  }
+  for (t in 13:24){
+    if (s[t-1]+ba*price[t-1]<=Ca){
+      p[t]<-1
+    }else{
+      p[t]<-0
+    } 
+    if(s[t-1]+ba*price[t-1]>=Da){
+      g[t]<-1
+    }else{
+      g[t]<-0
+    }
+    s[t]<- 14000*p[t]*60-16000*g[t]*60+s[t-1]
+  }
+  profit <- sum(g*270*price-p*300*price)
+  return(profit)
+}
+
+dec_var <- c(500000,500000,6*10^6,8*10^6,6*10^6,8*10^6, pump, gen, res)
+lower_bound <- c(-Inf, -Inf, 0, 0, 0, 0, rep(0,24), rep(0,24), rep(0,24)) 
+upper_bound <- c(+Inf, +Inf, 10*10^6, 10*10^6, 10*10^6, 10*10^6, rep(1,24), 
+                 rep(1,24), rep(10*10^6,23), 5000000) 
+ 
+optim(x <- dec_var,fn = profit.optim, price = price, method="L-BFGS-B", 
+      lower = lower_bound, upper = upper_bound, control = list(fnscale = -1))[1:2]
+```
+
+Hence, the maximum profit is $197,901.1$.
