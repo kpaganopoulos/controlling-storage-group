@@ -1,5 +1,4 @@
 # controlling-storage-group
-Pumped hydro storage project
 
 Tantalus Hydro (TH) operates a pumped hydro storage facility.  When power costs are low water can be pumped up into a raised reservoir and when power costs are high the same water can be released to generate power. The total usable capacity of the reservoir is 10,000,000 litres.
 
